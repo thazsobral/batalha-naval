@@ -1,0 +1,138 @@
+{
+  "entities": {
+    "Room": {
+      "title": "Room",
+      "description": "Game room state for Battleship multiplayer match",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the room",
+          "maxLength": 64
+        },
+        "code": {
+          "type": "string",
+          "description": "Short 6-character room invite code",
+          "maxLength": 10
+        },
+        "hostUid": {
+          "type": "string",
+          "description": "UID of the player hosting the room",
+          "maxLength": 128
+        },
+        "hostName": {
+          "type": "string",
+          "description": "Display name of the host player",
+          "maxLength": 50
+        },
+        "guestUid": {
+          "type": "string",
+          "description": "UID of the joining opponent",
+          "maxLength": 128
+        },
+        "guestName": {
+          "type": "string",
+          "description": "Display name of the guest player",
+          "maxLength": 50
+        },
+        "status": {
+          "type": "string",
+          "description": "Match progression status",
+          "enum": ["waiting", "placing", "battle", "finished"]
+        },
+        "hostReady": {
+          "type": "boolean",
+          "description": "Whether host finished fleet placement"
+        },
+        "guestReady": {
+          "type": "boolean",
+          "description": "Whether guest finished fleet placement"
+        },
+        "currentTurn": {
+          "type": "string",
+          "description": "Role whose turn it is to attack",
+          "enum": ["host", "guest"]
+        },
+        "winner": {
+          "type": "string",
+          "description": "Winner of the match or none",
+          "enum": ["host", "guest", "none"]
+        },
+        "hostAttacks": {
+          "type": "array",
+          "description": "List of attacks fired by host formatted as x,y,result",
+          "items": { "type": "string" }
+        },
+        "guestAttacks": {
+          "type": "array",
+          "description": "List of attacks fired by guest formatted as x,y,result",
+          "items": { "type": "string" }
+        },
+        "lastAction": {
+          "type": "string",
+          "description": "Latest game event description",
+          "maxLength": 200
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["id", "code", "hostUid", "hostName", "status", "hostReady", "guestReady", "currentTurn", "winner", "hostAttacks", "guestAttacks", "createdAt", "updatedAt"]
+    },
+    "Board": {
+      "title": "Board",
+      "description": "Secret ship fleet coordinates for each player",
+      "type": "object",
+      "properties": {
+        "roomId": {
+          "type": "string",
+          "description": "Associated room id",
+          "maxLength": 64
+        },
+        "playerId": {
+          "type": "string",
+          "description": "UID of the owner",
+          "maxLength": 128
+        },
+        "role": {
+          "type": "string",
+          "description": "Role in the room",
+          "enum": ["host", "guest"]
+        },
+        "fleet": {
+          "type": "array",
+          "description": "Array of ship coordinates and types",
+          "items": { "type": "string" }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["roomId", "playerId", "role", "fleet", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/rooms/{roomId}": {
+      "schema": {
+        "$ref": "#/entities/Room"
+      },
+      "description": "Multiplayer match rooms"
+    },
+    "/rooms/{roomId}/boards/{boardId}": {
+      "schema": {
+        "$ref": "#/entities/Board"
+      },
+      "description": "Secret fleet boards of players"
+    }
+  }
+}

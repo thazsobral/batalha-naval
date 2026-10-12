@@ -1,0 +1,110 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidRoom(data) {
+      return data.id is string && data.id.size() <= 64 &&
+             data.code is string && data.code.size() <= 10 &&
+             data.hostUid is string && data.hostUid.size() <= 128 &&
+             data.hostName is string && data.hostName.size() <= 50 &&
+             data.status in ['waiting', 'placing', 'battle', 'finished'] &&
+             data.hostReady is bool &&
+             data.guestReady is bool &&
+             data.currentTurn in ['host', 'guest'] &&
+             data.winner in ['host', 'guest', 'none'] &&
+             data.hostAttacks is list && data.hostAttacks.size() <= 100 &&
+             data.guestAttacks is list && data.guestAttacks.size() <= 100;
+    }
+
+    function isValidBoard(data) {
+      return data.roomId is string && data.roomId.size() <= 64 &&
+             data.playerId is string && data.playerId.size() <= 128 &&
+             data.role in ['host', 'guest'] &&
+             data.fleet is list && data.fleet.size() <= 100;
+    }
+
+    // Rooms collection
+    match /rooms/{roomId} {
+      // Any signed-in player can get room details to join or monitor game
+      allow get: if isSignedIn() && isValidId(roomId);
+      allow list: if false;
+
+      // Only host creates the room
+      allow create: if isSignedIn() &&
+                    isValidId(roomId) &&
+                    isValidRoom(incoming()) &&
+                    incoming().hostUid == request.auth.uid;
+
+      // Host or Guest can update with actions (join, mark ready, attack, finish)
+      allow update: if isSignedIn() &&
+                    isValidId(roomId) &&
+                    isValidRoom(incoming()) &&
+                    incoming().hostUid == existing().hostUid &&
+                    (
+                      existing().hostUid == request.auth.uid ||
+                      existing().guestUid == request.auth.uid ||
+                      ((!('guestUid' in existing()) || existing().guestUid == null) && incoming().guestUid == request.auth.uid)
+                    );
+
+      // Host can delete the room
+      allow delete: if isSignedIn() &&
+                    isValidId(roomId) &&
+                    existing().hostUid == request.auth.uid;
+
+      // Boards subcollection (secret ship placements)
+      match /boards/{boardId} {
+        // A player can inspect their own board at any time,
+        // OR an opponent can inspect after the match is finished!
+        allow get: if isSignedIn() &&
+                   isValidId(roomId) &&
+                   isValidId(boardId) &&
+                   (
+                     existing().playerId == request.auth.uid ||
+                     get(/databases/$(database)/documents/rooms/$(roomId)).data.status == 'finished'
+                   );
+        allow list: if false;
+
+        allow create: if isSignedIn() &&
+                      isValidId(roomId) &&
+                      isValidId(boardId) &&
+                      isValidBoard(incoming()) &&
+                      incoming().playerId == request.auth.uid;
+
+        allow update: if isSignedIn() &&
+                      isValidId(roomId) &&
+                      isValidId(boardId) &&
+                      isValidBoard(incoming()) &&
+                      existing().playerId == request.auth.uid &&
+                      incoming().playerId == request.auth.uid;
+
+        allow delete: if isSignedIn() &&
+                      isValidId(roomId) &&
+                      isValidId(boardId) &&
+                      existing().playerId == request.auth.uid;
+      }
+    }
+  }
+}
